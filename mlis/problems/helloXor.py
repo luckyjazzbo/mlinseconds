@@ -7,19 +7,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from ..utils import solutionmanager as sm
+from ..utils.gridsearch import GridSearch
 
 class SolutionModel(nn.Module):
-    def __init__(self, input_size, output_size):
+    def __init__(self, input_size, output_size, hidden_size):
         super(SolutionModel, self).__init__()
         self.input_size = input_size
         sm.SolutionManager.print_hint("Hint[1]: Xor can not be learned with only one layer")
-        self.hidden_size = 1
+        self.hidden_size = hidden_size
         self.linear1 = nn.Linear(input_size, self.hidden_size)
         self.linear2 = nn.Linear(self.hidden_size, output_size)
 
     def forward(self, x):
         x = self.linear1(x)
-        x = torch.sigmoid(x)
+        x = torch.relu_(x)
+        # x = torch.sigmoid(x)
         x = self.linear2(x)
         x = torch.sigmoid(x)
         return x
@@ -34,10 +36,14 @@ class SolutionModel(nn.Module):
 
 class Solution():
     def __init__(self):
-        self = self
+        self.lr = 1.0
+        self.lr_grid = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]
+        self.hidden_size = 15
+        self.hidden_size_grid = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 25, 30, 40]
+        self.grid_search = GridSearch(self) #.set_enabled(False)
 
     def create_model(self, input_size, output_size):
-        return SolutionModel(input_size, output_size)
+        return SolutionModel(input_size, output_size, self.hidden_size)
 
     # Return number of steps used
     def train_model(self, model, train_data, train_target, context):
@@ -50,13 +56,13 @@ class Solution():
             if time_left < 0.1:
                 break
             sm.SolutionManager.print_hint("Hint[2]: Learning rate is too small", step)
-            optimizer = optim.SGD(model.parameters(), lr=0.00001)
+            optimizer = optim.SGD(model.parameters(), lr=self.lr)
             data = train_data
             target = train_target
             # model.parameters()...gradient set to zero
             optimizer.zero_grad()
             # evaluate model => model.forward(data)
-            output = model(data)
+            output = model.forward(data)
             # if x < 0.5 predict 0 else predict 1
             predict = model.calc_predict(output)
             # Number of correct predictions
@@ -65,10 +71,18 @@ class Solution():
             total = predict.view(-1).size(0)
             # calculate loss
             loss = model.calc_loss(output, target)
+            self.grid_search.log_step_value('loss', loss.item(), step)
             # calculate deriviative of model.forward() and put it in model.parameters()...gradient
             loss.backward()
             # print progress of the learning
             self.print_stats(step, loss, correct, total)
+            if correct == total:
+                if step <= 10:
+                    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                print("CORRECT == TOTAL - {}, lr={}, hidden_size={}, loss={}".format(step, self.lr, self.hidden_size, loss.item()))
+                break
+            if step >= 100:
+                break
             # update model: model.parameters() -= lr * gradient
             optimizer.step()
             step += 1
