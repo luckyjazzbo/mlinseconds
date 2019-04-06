@@ -19,11 +19,12 @@ class SolutionModel(nn.Module):
         self.solution = solution
         self.input_size = input_size
         # sm.SolutionManager.print_hint("Hint[1]: Explore more deep neural networks")
-        self.hidden1_size = self.solution.hidden1_size
-        self.hidden2_size = self.solution.hidden2_size
-        self.linear1 = nn.Linear(input_size, self.hidden1_size)
-        self.linear2 = nn.Linear(self.hidden1_size, self.hidden2_size)
-        self.linear3 = nn.Linear(self.hidden2_size, output_size)
+        self.hidden_size = self.solution.hidden_size
+        self.linear1 = nn.Linear(input_size, self.hidden_size)
+        self.linear2 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.linear3 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.linear4 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.linear5 = nn.Linear(self.hidden_size, output_size)
 
     def forward(self, x):
         x = self.linear1(x)
@@ -31,6 +32,10 @@ class SolutionModel(nn.Module):
         x = self.linear2(x)
         x = self.solution.activations[self.solution.activation_hidden](x)
         x = self.linear3(x)
+        x = self.solution.activations[self.solution.activation_hidden](x)
+        x = self.linear4(x)
+        x = self.solution.activations[self.solution.activation_hidden](x)
+        x = self.linear5(x)
         x = torch.sigmoid(x)
         return x
 
@@ -45,22 +50,22 @@ class SolutionModel(nn.Module):
 class Solution():
     def __init__(self):
         self.activations = {
-            # 'sigmoid': nn.Sigmoid(),
-            # 'relu': nn.ReLU(),
-            # 'relu6': nn.ReLU6(),
-            # 'rrelu0103': nn.RReLU(0.1, 0.3),
-            # 'rrelu0205': nn.RReLU(0.2, 0.5),
+            'sigmoid': nn.Sigmoid(),
+            'relu': nn.ReLU(),
+            'relu6': nn.ReLU6(),
+            'rrelu0103': nn.RReLU(0.1, 0.3),
+            'rrelu0205': nn.RReLU(0.2, 0.5),
             'htang1': nn.Hardtanh(-1, 1),
             'htang2': nn.Hardtanh(-2, 2),
             'htang3': nn.Hardtanh(-3, 3),
             'tanh': nn.Tanh(),
-            # 'elu': nn.ELU(),
-            # 'selu': nn.SELU(),
-            # 'hardshrink': nn.Hardshrink(),
-            # 'leakyrelu01': nn.LeakyReLU(0.1),
-            # 'leakyrelu001': nn.LeakyReLU(0.01),
-            # 'logsigmoid': nn.LogSigmoid(),
-            # 'prelu': nn.PReLU(),
+            'elu': nn.ELU(),
+            'selu': nn.SELU(),
+            'hardshrink': nn.Hardshrink(),
+            'leakyrelu01': nn.LeakyReLU(0.1),
+            'leakyrelu001': nn.LeakyReLU(0.01),
+            'logsigmoid': nn.LogSigmoid(),
+            'prelu': nn.PReLU(),
         }
         self.loss_functions = {
             'binary_cross_entropy': nn.BCELoss(),
@@ -82,18 +87,19 @@ class Solution():
             'soft_margin_loss': nn.SoftMarginLoss(),
             # 'triplet_margin_loss': nn.TripletMarginLoss(),
         }
-        self.learning_rate = 2.79
-        self.hidden1_size = 30
-        self.hidden2_size = 10
-        self.activation_hidden = 'tanh'
+        self.learning_rate = 2.8
+        self.momentum = 0.8
+        self.hidden_size = 10
+        self.activation_hidden = 'relu'
         self.loss_function = 'binary_cross_entropy'
-        # self.sols = {}
-        # self.solsSum = {}
+        self.sols = {}
+        self.solsSum = {}
         self.random = 3
-        # self.random_grid = [0, 3, 6, 9]
-        # self.hidden1_size_grid = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-        # self.hidden2_size_grid = [5, 7, 10, 15]
-        # self.learning_rate_grid = [2.79, 2.75]
+        self.random_grid = [_ for _ in range(10)]
+        # self.hidden_size_grid = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
+        # self.hidden_size_grid = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        # self.learning_rate_grid = [0.1, 1.0, 2.0, 3.0, 5.0]
+        # self.activation_hidden_grid = list(self.activations.keys())
         # self.activation_hidden_grid = list(self.activations.keys())
         # self.loss_function_grid = list(self.loss_functions.keys())
         self.grid_search = GridSearch(self)
@@ -108,22 +114,22 @@ class Solution():
         step = 0
         # Put model in train mode
         model.train()
+        optimizer = optim.SGD(model.parameters(), lr=self.learning_rate, momentum=self.momentum)
         while True:
             time_left = context.get_timer().get_time_left()
             # No more time left, stop training
-            key = "{}_{}_{}_{}_{}".format(self.learning_rate, self.hidden1_size, self.hidden2_size, self.activation_hidden, self.loss_function)
+            key = "{}_{}_{}_{}_{}".format(self.learning_rate, self.momentum, self.hidden_size, self.activation_hidden, self.loss_function)
             # Speed up search
             if time_left < 0.1 or (self.grid_search.enabled and step > 1500):
-                # if not key in self.sols:
-                #     self.sols[key] = 0
-                #     self.solsSum[key] = 0
-                # self.sols[key] += 1
-                # self.solsSum[key] += step
-                # self.sols[key] = -1
+                if not key in self.sols:
+                    self.sols[key] = 0
+                    self.solsSum[key] = 0
+                self.sols[key] += 1
+                self.solsSum[key] += step
+                self.sols[key] = -1
                 break
-            # if key in self.sols and self.sols[key] == -1:
-            #     break
-            optimizer = optim.SGD(model.parameters(), lr=self.learning_rate)
+            if key in self.sols and self.sols[key] == -1:
+                break
             data = train_data
             target = train_target
             # model.parameters()...gradient set to zero
@@ -138,22 +144,17 @@ class Solution():
             # Total number of needed predictions
             total = predict.view(-1).size(0)
             if correct == total:
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                print("Learning rate = {} Hidden1 size = {} Hidden2 size = {} Activation hidden = {} Loss function = {} Random = {} Steps = {}".format(
-                    self.learning_rate, self.hidden1_size, self.hidden2_size, self.activation_hidden, self.loss_function, self.random, step))
-
-                # if not key in self.sols:
-                #     self.sols[key] = 0
-                #     self.solsSum[key] = 0
-                # self.sols[key] += 1
-                # self.solsSum[key] += step
-                # #if self.sols[key] > 1:
-                # #    print("Key = {} Avg = {:.2f} Ins = {}".format(key, float(self.solsSum[key])/self.sols[key], self.sols[key]))
-                # if self.sols[key] == len(self.random_grid):
-                #     #self.best_step = step
-                # print("Learning rate = {} Hidden1 size = {} Hidden2 size = {} Activation hidden = {} Loss function = {} Steps = {}".format(
-                #     self.learning_rate, self.hidden1_size, self.hidden2_size, self.activation_hidden, self.loss_function, step))
-                #     print("{:.4f}".format(float(self.solsSum[key])/self.sols[key]))
+                if not key in self.sols:
+                    self.sols[key] = 0
+                    self.solsSum[key] = 0
+                self.sols[key] += 1
+                self.solsSum[key] += step
+                #if self.sols[key] > 1:
+                #    print("Key = {} Avg = {:.2f} Ins = {}".format(key, float(self.solsSum[key])/self.sols[key], self.sols[key]))
+                if self.sols[key] == len(self.random_grid):
+                    # self.best_step = step
+                    print("{:.4f}, Learning rate = {} Momentum = {} Hidden size = {} Activation1 hidden = {} Activation2 hidden = {} Loss function = {} Steps = {}".format(
+                        float(self.solsSum[key]) / self.sols[key], self.learning_rate, self.momentum, self.hidden_size, self.hidden_size, self.activation_hidden, self.loss_function, step))
                 break
             # calculate loss
             # sm.SolutionManager.print_hint("Hint[3]: Explore other loss functions", step)
@@ -161,16 +162,16 @@ class Solution():
             # calculate deriviative of model.forward() and put it in model.parameters()...gradient
             loss.backward()
             # print progress of the learning
-            self.print_stats(step, loss, correct, total)
+            # self.print_stats(step, loss, correct, total)
             # update model: model.parameters() -= lr * gradient
             optimizer.step()
             step += 1
         return step
     
-    def print_stats(self, step, loss, correct, total):
-        if step % 500 == 0:
-            print("Prediction = {}/{} Error = {} Learning rate = {} Hidden1 size = {} Hidden2 size = {} Step = {}".format(
-                correct, total, loss.item(), self.learning_rate, self.hidden1_size, self.hidden2_size, step))
+    # def print_stats(self, step, loss, correct, total):
+    #     if step % 500 == 0:
+    #         print("Prediction = {}/{} Error = {} Learning rate = {} Hidden1 size = {} Hidden2 size = {} Step = {}".format(
+    #             correct, total, loss.item(), self.learning_rate, self.hidden_size, self.hidden_size, step))
 
 ###
 ###
